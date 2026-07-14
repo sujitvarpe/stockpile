@@ -154,4 +154,7 @@ def fetch_chain(ticker: str, opt_type: str = "both",
         from options_scanner.moomoo_chain import fetch_chain_moomoo
         return fetch_chain_moomoo(ticker, opt_type, min_dte, max_dte,
                                   moomoo_config)
+    if provider == "alpaca":
+        from options_scanner.alpaca_chain import fetch_chain_alpaca
+        return fetch_chain_alpaca(ticker, opt_type, min_dte, max_dte)
     return _fetch_chain_yahoo(ticker, opt_type, min_dte, max_dte)

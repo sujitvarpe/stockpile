@@ -237,6 +237,8 @@ st.iframe(
 def _source_label(s: str) -> str:
     if s == "yahoo":
         return "Yahoo Finance"
+    if s == "alpaca":
+        return "Alpaca"
     if s == "moomoo":
         return "Moomoo (live)"
     if not _schwab_configured:
@@ -246,7 +248,7 @@ def _source_label(s: str) -> str:
 with st.container(key="data_source_pill"):
     _source_raw = st.segmented_control(
         "Data source",
-        ["yahoo", "schwab", "moomoo"],
+        ["yahoo", "alpaca", "schwab", "moomoo"],
         format_func=_source_label,
         label_visibility="collapsed",
         key="data_source_choice",
@@ -256,6 +258,8 @@ if _source_raw is None:
 
 if _source_raw == "schwab" and _schwab_configured:
     data_source = "schwab"
+elif _source_raw == "alpaca":
+    data_source = "alpaca"
 elif _source_raw == "moomoo":
     data_source = "moomoo"
 else:
