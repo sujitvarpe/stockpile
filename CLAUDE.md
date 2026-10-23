@@ -82,6 +82,18 @@ that port is taken; `OSC_DASHBOARD_URL` overrides the whole embed URL for
 reverse-proxy or single-exposed-port setups (and takes precedence over the
 port).
 
+### Discord market digest
+
+```bash
+uv run discord-alerts/market_digest.py all --dry-run
+```
+
+Posts today's earnings calendar (pre-market) and sector performance +
+sector leaders (after the close) to `DISCORD_WEBHOOK_URL`, from
+TradingView screener data. Scheduled by
+`.github/workflows/discord-market-digest.yml`; see
+`discord-alerts/README.md`.
+
 ## Project structure
 
 - `shared/` — pip-installable `stocks-shared` package: CSV parsers,
@@ -91,6 +103,7 @@ port).
 - `options-scanner/` — options scanner (web UI + CLI)
 - `trading-dashboard/` — Flask live candlestick dashboard
   (yfinance / Schwab / Hyperliquid data sources)
+- `discord-alerts/` — daily Discord digest (sectors, leaders, earnings)
 - `google-sheets-setup/` — Google Sheets API setup docs
 - `input/` — brokerage CSV exports (gitignored)
 
