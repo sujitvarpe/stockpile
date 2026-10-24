@@ -27,6 +27,7 @@ jobs:
       - name: Post to Discord
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL_2: ${{ secrets.DISCORD_WEBHOOK_URL_2 }}
           SCHEDULE: ${{ github.event.schedule }}
           REPORT: ${{ inputs.report }}
         run: |

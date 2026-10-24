@@ -20,6 +20,9 @@ relative volume.
    Webhook** → **Copy Webhook URL**.
 2. In GitHub: repo → **Settings → Secrets and variables → Actions → New
    repository secret**, name `DISCORD_WEBHOOK_URL`, paste the URL.
+   To post to a second channel or server too, add another secret named
+   `DISCORD_WEBHOOK_URL_2`; every report goes to both. If one webhook
+   fails the other still gets the post and the run is marked failed.
 3. Repo → **Actions → Discord market digest → Run workflow** to send a
    test post right away. After that it runs on its own every weekday
    (`.github/workflows/discord-market-digest.yml`). GitHub only runs
