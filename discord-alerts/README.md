@@ -6,7 +6,7 @@ from TradingView screener data (the same data the TradingView MCP tools
 
 | Report | When (New York) | What's in it |
 |--------|-----------------|--------------|
-| `earnings` | ~08:07, weekdays | Today's US earnings (market cap ≥ $2B), split into before-open / after-close, with consensus EPS and revenue |
+| `earnings` | ~08:07, weekdays | Today's US earnings (Monday's on a weekend; market cap ≥ $2B), split into before-open / after-close, with consensus EPS and revenue |
 | `sectors` | ~16:17, weekdays | SPDR sector ETFs ranked by day % change, cap-weighted TradingView sectors with % advancing, and the top 5 leaders in each of the 3 strongest sectors |
 
 A **leader** is a stock in a top sector that is up on the day, closes

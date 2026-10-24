@@ -281,12 +281,13 @@ def earnings_report(day: dt.date, min_cap: float, per_group: int) -> dict:
         fields.append({"name": name, "value": code(lines), "inline": False})
 
     total = len(found)
+    when = "today" if day == dt.datetime.now(ET).date() else f"on {day.strftime('%A')}"
     return {
         "title": f"Earnings calendar · {day.strftime('%a %b %d, %Y')}",
         "description": (
-            f"**{total}** US companies with market cap ≥ {money(min_cap)} report today."
+            f"**{total}** US companies with market cap ≥ {money(min_cap)} report {when}."
             " Reported rows show actual EPS (✓ beat / ✗ miss)."
-            if total else f"No US companies with market cap ≥ {money(min_cap)} report today."
+            if total else f"No US companies with market cap ≥ {money(min_cap)} report {when}."
         ),
         "color": GREY,
         "fields": fields,
@@ -319,6 +320,11 @@ def post(embeds: list[dict], webhook: str | None, dry_run: bool) -> None:
         sys.exit(f"Discord webhook failed: {e.code} {e.read().decode(errors='replace')}")
 
 
+def next_trading_day(day: dt.date) -> dt.date:
+    """The day itself on a weekday, else the following Monday."""
+    return day + dt.timedelta(days=7 - day.weekday()) if day.weekday() >= 5 else day
+
+
 def in_et_window(window: str) -> bool:
     """True if the current New York time is inside HH:MM-HH:MM."""
     lo, hi = (dt.time.fromisoformat(t) for t in window.split("-"))
@@ -330,7 +336,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("report", choices=["sectors", "earnings", "all"])
     p.add_argument("--date", type=dt.date.fromisoformat,
-                   help="earnings date (default: today in New York)")
+                   help="earnings date (default: today in New York, or Monday on a weekend)")
     p.add_argument("--earnings-min-cap", type=float, default=2e9)
     p.add_argument("--leaders-min-cap", type=float, default=2e9)
     p.add_argument("--top-sectors", type=int, default=3)
@@ -349,7 +355,7 @@ def main() -> None:
     if args.report in ("sectors", "all"):
         embeds.append(sectors_report(args.leaders_min_cap, args.leaders, args.top_sectors))
     if args.report in ("earnings", "all"):
-        day = args.date or dt.datetime.now(ET).date()
+        day = args.date or next_trading_day(dt.datetime.now(ET).date())
         embeds.append(earnings_report(day, args.earnings_min_cap, args.per_group))
     for e in embeds:
         post([e], os.environ.get("DISCORD_WEBHOOK_URL"), args.dry_run)
