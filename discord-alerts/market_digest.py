@@ -319,11 +319,15 @@ def post(embeds: list[dict], webhook: str | None, dry_run: bool) -> None:
         sys.exit(f"Discord webhook failed: {e.code} {e.read().decode(errors='replace')}")
 
 
-def in_et_window(window: str) -> bool:
-    """True if the current New York time is inside HH:MM-HH:MM."""
-    lo, hi = (dt.time.fromisoformat(t) for t in window.split("-"))
-    now = dt.datetime.now(ET).time()
-    return lo <= now < hi
+def cron_is_et(cron_utc: str, et_time: str) -> bool:
+    """True if a HH:MM UTC cron lands on HH:MM New York time today.
+
+    Decided from today's UTC offset, not the clock, because GitHub often
+    starts scheduled runs an hour or more late.
+    """
+    utc = dt.datetime.combine(dt.datetime.now(dt.timezone.utc).date(),
+                              dt.time.fromisoformat(cron_utc), dt.timezone.utc)
+    return utc.astimezone(ET).time() == dt.time.fromisoformat(et_time)
 
 
 def main() -> None:
@@ -336,13 +340,15 @@ def main() -> None:
     p.add_argument("--top-sectors", type=int, default=3)
     p.add_argument("--leaders", type=int, default=5, help="leaders per sector")
     p.add_argument("--per-group", type=int, default=20, help="earnings rows per session")
-    p.add_argument("--et-window", help="only run when New York time is in HH:MM-HH:MM "
-                   "(lets a DST-agnostic pair of UTC crons fire once)")
+    p.add_argument("--cron-utc", help="HH:MM UTC this run was scheduled for; with "
+                   "--et-time, lets a DST-agnostic pair of UTC crons fire once")
+    p.add_argument("--et-time", help="HH:MM New York time the report is meant for")
     p.add_argument("--dry-run", action="store_true")
     args = p.parse_args()
 
-    if args.et_window and not in_et_window(args.et_window):
-        print(f"Outside {args.et_window} New York time; nothing to do.")
+    if args.cron_utc and args.et_time and not cron_is_et(args.cron_utc, args.et_time):
+        print(f"{args.cron_utc} UTC is not {args.et_time} New York time today; "
+              "the other cron of the pair posts.")
         return
 
     embeds = []
