@@ -18,7 +18,8 @@ Usage (from the repo root):
     uv run discord-alerts/market_digest.py earnings --date 2026-10-27
     uv run discord-alerts/market_digest.py all --dry-run
 
-The webhook URL is read from DISCORD_WEBHOOK_URL. --dry-run prints the
+Webhook URLs are read from DISCORD_WEBHOOK_URL and DISCORD_WEBHOOK_URL_2
+(every report goes to each of them). --dry-run prints the
 Discord payload instead of posting it. Standard library only, so the
 GitHub Actions job needs nothing but uv.
 """
@@ -281,12 +282,13 @@ def earnings_report(day: dt.date, min_cap: float, per_group: int) -> dict:
         fields.append({"name": name, "value": code(lines), "inline": False})
 
     total = len(found)
+    when = "today" if day == dt.datetime.now(ET).date() else f"on {day.strftime('%A')}"
     return {
         "title": f"Earnings calendar · {day.strftime('%a %b %d, %Y')}",
         "description": (
-            f"**{total}** US companies with market cap ≥ {money(min_cap)} report today."
+            f"**{total}** US companies with market cap ≥ {money(min_cap)} report {when}."
             " Reported rows show actual EPS (✓ beat / ✗ miss)."
-            if total else f"No US companies with market cap ≥ {money(min_cap)} report today."
+            if total else f"No US companies with market cap ≥ {money(min_cap)} report {when}."
         ),
         "color": GREY,
         "fields": fields,
@@ -297,7 +299,7 @@ def earnings_report(day: dt.date, min_cap: float, per_group: int) -> dict:
 # ── Discord ─────────────────────────────────────────────────────────────
 
 
-def post(embeds: list[dict], webhook: str | None, dry_run: bool) -> None:
+def post(embeds: list[dict], webhooks: list[str], dry_run: bool) -> None:
     payload = {"username": "Market Digest", "embeds": embeds}
     if dry_run:
         print(json.dumps(payload, indent=2, ensure_ascii=False))
@@ -306,17 +308,35 @@ def post(embeds: list[dict], webhook: str | None, dry_run: bool) -> None:
             for f in e["fields"]:
                 print(f"\n{f['name']}\n{f['value']}")
         return
-    if not webhook:
+    if not webhooks:
         sys.exit("DISCORD_WEBHOOK_URL is not set (use --dry-run to preview).")
-    req = urllib.request.Request(
-        webhook,
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json", "User-Agent": USER_AGENT},
-    )
-    try:
-        urllib.request.urlopen(req, timeout=30).close()
-    except urllib.error.HTTPError as e:
-        sys.exit(f"Discord webhook failed: {e.code} {e.read().decode(errors='replace')}")
+    # Post to every channel before failing, so one bad webhook doesn't
+    # silence the others.
+    failed = []
+    for i, webhook in enumerate(webhooks, 1):
+        req = urllib.request.Request(
+            webhook,
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json", "User-Agent": USER_AGENT},
+        )
+        try:
+            urllib.request.urlopen(req, timeout=30).close()
+        except urllib.error.HTTPError as e:
+            failed.append(f"webhook #{i}: {e.code} {e.read().decode(errors='replace')}")
+    if failed:
+        sys.exit("Discord webhook failed: " + "; ".join(failed))
+
+
+def webhooks_from_env() -> list[str]:
+    """DISCORD_WEBHOOK_URL and DISCORD_WEBHOOK_URL_2, each of which may also
+    hold several URLs separated by commas or whitespace."""
+    raw = " ".join(os.environ.get(k, "") for k in ("DISCORD_WEBHOOK_URL", "DISCORD_WEBHOOK_URL_2"))
+    return list(dict.fromkeys(raw.replace(",", " ").split()))
+
+
+def next_trading_day(day: dt.date) -> dt.date:
+    """The day itself on a weekday, else the following Monday."""
+    return day + dt.timedelta(days=7 - day.weekday()) if day.weekday() >= 5 else day
 
 
 def cron_is_et(cron_utc: str, et_time: str) -> bool:
@@ -334,7 +354,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("report", choices=["sectors", "earnings", "all"])
     p.add_argument("--date", type=dt.date.fromisoformat,
-                   help="earnings date (default: today in New York)")
+                   help="earnings date (default: today in New York, or Monday on a weekend)")
     p.add_argument("--earnings-min-cap", type=float, default=2e9)
     p.add_argument("--leaders-min-cap", type=float, default=2e9)
     p.add_argument("--top-sectors", type=int, default=3)
@@ -355,10 +375,11 @@ def main() -> None:
     if args.report in ("sectors", "all"):
         embeds.append(sectors_report(args.leaders_min_cap, args.leaders, args.top_sectors))
     if args.report in ("earnings", "all"):
-        day = args.date or dt.datetime.now(ET).date()
+        day = args.date or next_trading_day(dt.datetime.now(ET).date())
         embeds.append(earnings_report(day, args.earnings_min_cap, args.per_group))
+    webhooks = webhooks_from_env()
     for e in embeds:
-        post([e], os.environ.get("DISCORD_WEBHOOK_URL"), args.dry_run)
+        post([e], webhooks, args.dry_run)
 
 
 if __name__ == "__main__":
